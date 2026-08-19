@@ -1,3 +1,6 @@
+import os
+
+from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
@@ -6,9 +9,18 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.routers import admin, examen, professeur, etudiant
 from app.api import api_router
 
+load_dotenv()
+
+SESSION_SECRET_KEY = os.getenv("SECRET_KEY")
+if not SESSION_SECRET_KEY:
+    raise RuntimeError(
+        "SECRET_KEY manquant. Ajoute SECRET_KEY=... dans ton fichier .env "
+        "(voir .env.example)."
+    )
+
 app = FastAPI(title="Système de Correction d'Examens", version="2.0.0")
 
-app.add_middleware(SessionMiddleware, secret_key="SECRET_KEY_EXAM_APP")
+app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET_KEY)
 
 app.add_middleware(
     CORSMiddleware,

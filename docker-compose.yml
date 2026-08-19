@@ -23,6 +23,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    env_file:
+      - ./backend/.env
     environment:
       DATABASE_URL: postgresql+psycopg2://postgres:123@db:5432/db_exam
       PYTHONPATH: /app
