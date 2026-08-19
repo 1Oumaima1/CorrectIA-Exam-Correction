@@ -1,3 +1,5 @@
+import os
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -10,7 +12,12 @@ from app.auth import verify_password
 
 router = APIRouter()
 
-SECRET_KEY = "SECRET_JWT_KEY_EXAM_2024"
+SECRET_KEY = os.getenv("SECRET_JWT_KEY")
+if not SECRET_KEY:
+    raise RuntimeError(
+        "SECRET_JWT_KEY manquant. Ajoute SECRET_JWT_KEY=... dans ton fichier .env "
+        "(voir .env.example)."
+    )
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 8  # 8 heures
 
