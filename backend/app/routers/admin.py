@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Form, Request
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 from datetime import datetime
 
 from app.database import SessionLocal
@@ -12,10 +12,8 @@ from app.utils import log_activity
 router = APIRouter(prefix="/admin", tags=["Admin"])
 templates = Jinja2Templates(directory="templates")
 
-
-# =====================================================
 # DB DEPENDENCY
-# =====================================================
+
 def get_db():
     db = SessionLocal()
     try:
@@ -24,9 +22,9 @@ def get_db():
         db.close()
 
 
-# =====================================================
+
 # LOGIN ADMIN
-# =====================================================
+
 @router.get("/login")
 def admin_login_page(request: Request):
     return templates.TemplateResponse(
@@ -58,9 +56,9 @@ def admin_login_form(
     return RedirectResponse("/admin/dashboard", status_code=303)
 
 
-# =====================================================
+
 # DASHBOARD
-# =====================================================
+
 @router.get("/dashboard")
 def admin_dashboard(request: Request, db: Session = Depends(get_db)):
     professeurs = db.query(models.Professeur).all()
@@ -80,12 +78,13 @@ def admin_dashboard(request: Request, db: Session = Depends(get_db)):
     )
 
 
-# =====================================================
-# FILIERE
-# =====================================================
+
+# FILIERE - CREATE
+
 @router.get("/filiere/create")
 def show_create_filiere_form(request: Request):
     return templates.TemplateResponse("create_filiere.html", {"request": request})
+
 
 @router.post("/filiere/create")
 def create_filiere(request: Request, nom: str = Form(...), db: Session = Depends(get_db)):
@@ -109,147 +108,17 @@ def create_filiere(request: Request, nom: str = Form(...), db: Session = Depends
     db.commit()
     return RedirectResponse("/admin/dashboard", status_code=303)
 
-# =====================================================
+
+
 # LISTE DES FILIERES
-# =====================================================
+
 @router.get("/filieres")
 def list_filieres(request: Request, db: Session = Depends(get_db)):
     filieres = db.query(models.Filiere).all()
     # Charger les classes pour chaque filière
     for filiere in filieres:
-        # Cette ligne assure que les classes sont chargées
-        db.refresh(filiere)
+        filiere.classes  # Force le chargement des classes associées
 
-    return templates.TemplateResponse(
-        "list_filieres.html",
-        {
-            "request": request,
-            "filieres": filieres
-        }
-    )
-    
-from fastapi import APIRouter, Depends, HTTPException, Form, Request
-from fastapi.templating import Jinja2Templates
-from fastapi.responses import RedirectResponse, HTMLResponse
-from sqlalchemy.orm import Session
-from sqlalchemy import or_
-from datetime import datetime
-
-from app.database import SessionLocal
-from app import models
-from app.auth import hash_password, verify_password
-
-router = APIRouter(prefix="/admin", tags=["Admin"])
-templates = Jinja2Templates(directory="templates")
-
-
-# =====================================================
-# DB DEPENDENCY
-# =====================================================
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-# =====================================================
-# LOGIN ADMIN
-# =====================================================
-@router.get("/login")
-def admin_login_page(request: Request):
-    return templates.TemplateResponse(
-        "admin_login.html",
-        {"request": request}
-    )
-
-
-@router.post("/login/form")
-def admin_login_form(
-    request: Request,
-    email: str = Form(...),
-    password: str = Form(...),
-    db: Session = Depends(get_db)
-):
-    admin = db.query(models.Admin).filter(
-        models.Admin.email == email
-    ).first()
-
-    if not admin or not verify_password(password, admin.password_hash):
-        return templates.TemplateResponse(
-            "admin_login.html",
-            {
-                "request": request,
-                "error": "Email ou mot de passe incorrect"
-            }
-        )
-
-    return RedirectResponse("/admin/dashboard", status_code=303)
-
-
-# =====================================================
-# DASHBOARD
-# =====================================================
-@router.get("/dashboard")
-def admin_dashboard(request: Request, db: Session = Depends(get_db)):
-    professeurs = db.query(models.Professeur).all()
-    etudiants = db.query(models.Etudiant).all()
-    filieres = db.query(models.Filiere).all()
-    classes = db.query(models.Classe).all()
-
-    return templates.TemplateResponse(
-        "admin_dashboard.html",
-        {
-            "request": request,
-            "professeurs": professeurs,
-            "etudiants": etudiants,
-            "filieres": filieres,
-            "classes": classes
-        }
-    )
-
-
-# =====================================================
-# FILIERE - CREATE
-# =====================================================
-@router.get("/filiere/create")
-def show_create_filiere_form(request: Request):
-    return templates.TemplateResponse("create_filiere.html", {"request": request})
-
-@router.post("/filiere/create")
-def create_filiere(request: Request, nom: str = Form(...), db: Session = Depends(get_db)):
-    nom = nom.strip().upper()
-    if db.query(models.Filiere).filter_by(nom=nom).first():
-        return templates.TemplateResponse(
-            "admin_dashboard.html",
-            {
-                "request": request,
-                "error": "Filière déjà existante",
-                "professeurs": db.query(models.Professeur).all(),
-                "etudiants": db.query(models.Etudiant).all(),
-                "filieres": db.query(models.Filiere).all(),
-                "classes": db.query(models.Classe).all(),
-            }
-        )
-
-    filiere = models.Filiere(nom=nom)
-    db.add(filiere)
-    db.commit()
-    return RedirectResponse("/admin/dashboard", status_code=303)
-
-
-# =====================================================
-# LISTE DES FILIERES
-# =====================================================
-@router.get("/filieres")
-def list_filieres(request: Request, db: Session = Depends(get_db)):
-    filieres = db.query(models.Filiere).all()
-    # Charger les classes pour chaque filière
-    for filiere in filieres:
-        # Cette ligne assure que les classes sont chargées
-        filiere.classes  # Cette instruction force le chargement
-    
     return templates.TemplateResponse(
         "list_filieres.html",
         {
@@ -259,19 +128,18 @@ def list_filieres(request: Request, db: Session = Depends(get_db)):
     )
 
 
-# =====================================================
+
 # FILIERE - EDIT
-# =====================================================
+
 @router.get("/filiere/{id}/edit")
 def edit_filiere_page(id: int, request: Request, db: Session = Depends(get_db)):
     filiere = db.query(models.Filiere).filter(models.Filiere.id == id).first()
-    
+
     if not filiere:
         raise HTTPException(status_code=404, detail="Filière non trouvée")
-    
-    # Récupérer les classes associées
+
     classes = db.query(models.Classe).filter(models.Classe.filiere_id == id).all()
-    
+
     return templates.TemplateResponse(
         "edit_filiere.html",
         {
@@ -280,6 +148,8 @@ def edit_filiere_page(id: int, request: Request, db: Session = Depends(get_db)):
             "classes": classes
         }
     )
+
+
 @router.post("/filiere/{id}/update")
 def update_filiere(
     id: int,
@@ -288,13 +158,12 @@ def update_filiere(
     db: Session = Depends(get_db)
 ):
     filiere = db.query(models.Filiere).filter(models.Filiere.id == id).first()
-    
+
     if not filiere:
         raise HTTPException(status_code=404, detail="Filière non trouvée")
-    
+
     nom = nom.strip().upper()
-    
-    # Validation
+
     if not nom:
         return templates.TemplateResponse(
             "edit_filiere.html",
@@ -304,13 +173,12 @@ def update_filiere(
                 "error": "Le nom de la filière est obligatoire"
             }
         )
-    
-    # Vérifier si le nom existe déjà (sauf pour la filière actuelle)
+
     existing_filiere = db.query(models.Filiere).filter(
         models.Filiere.nom == nom,
         models.Filiere.id != id
     ).first()
-    
+
     if existing_filiere:
         return templates.TemplateResponse(
             "edit_filiere.html",
@@ -320,14 +188,14 @@ def update_filiere(
                 "error": "Une filière avec ce nom existe déjà"
             }
         )
-    
+
     try:
-        # Mettre à jour la filière
         filiere.nom = nom
+        log_activity(db, "filiere", f"Filière modifiée : {nom}")
         db.commit()
-        
+
         return RedirectResponse("/admin/filieres?success=Filière modifiée avec succès", status_code=303)
-        
+
     except Exception as e:
         db.rollback()
         return templates.TemplateResponse(
@@ -339,44 +207,46 @@ def update_filiere(
             }
         )
 
+
+
 # FILIERE - DELETE
-# =====================================================
+
 @router.post("/filiere/{id}/delete")
 def delete_filiere(id: int, db: Session = Depends(get_db)):
     filiere = db.query(models.Filiere).filter(models.Filiere.id == id).first()
-    
+
     if not filiere:
         raise HTTPException(status_code=404, detail="Filière non trouvée")
-    
+
     try:
-        # Vérifier s'il y a des classes associées
         if filiere.classes:
-            # Désassocier les classes (mettre filiere_id à NULL)
             for classe in filiere.classes:
                 classe.filiere_id = None
                 db.add(classe)
-        
+
         db.delete(filiere)
+        log_activity(db, "filiere", f"Filière supprimée : {filiere.nom}")
         db.commit()
-        
+
         return RedirectResponse("/admin/filieres?success=Filière supprimée avec succès", status_code=303)
-        
+
     except Exception as e:
         db.rollback()
         return RedirectResponse(f"/admin/filieres?error=Erreur lors de la suppression : {str(e)}", status_code=303)
 
-# =====================================================
+
+
 # CLASSE
-# =====================================================
+
 @router.get("/classe/create")
 def show_create_classe_form(request: Request, db: Session = Depends(get_db)):
-    # Récupérer toutes les filières pour le formulaire
     filieres = db.query(models.Filiere).all()
     return templates.TemplateResponse("create_classe.html", {
         "request": request,
         "filieres": filieres
     })
-    
+
+
 @router.post("/classe/create")
 def create_classe(
     request: Request,
@@ -395,9 +265,9 @@ def create_classe(
     return RedirectResponse("/admin/dashboard", status_code=303)
 
 
-# =====================================================
-# PROFESSEUR
-# =====================================================
+
+# PROFESSEUR - CREATE
+
 @router.get("/create_professeur")
 def create_professeur_page(request: Request):
     return templates.TemplateResponse("create_professeur.html", {"request": request})
@@ -434,17 +304,17 @@ def create_professeur(
     db.commit()
     return RedirectResponse("/admin/dashboard", status_code=303)
 
+
+
 # LISTE DES PROFESSEURS
-# =====================================================
+
 @router.get("/professeurs")
 def list_professeurs(request: Request, db: Session = Depends(get_db)):
     professeurs = db.query(models.Professeur).all()
-    
-    # Charger les classes pour chaque professeur
+
     for professeur in professeurs:
-        # Force le chargement des classes associées
-        professeur.classes
-    
+        professeur.classes  # Force le chargement des classes associées
+
     return templates.TemplateResponse(
         "list_professeurs.html",
         {
@@ -452,9 +322,11 @@ def list_professeurs(request: Request, db: Session = Depends(get_db)):
             "professeurs": professeurs
         }
     )
-# =====================================================
-# ETUDIANT
-# =====================================================
+
+
+
+# ETUDIANT - CREATE
+
 @router.get("/create_etudiant")
 def create_etudiant_page(request: Request, db: Session = Depends(get_db)):
     classes = db.query(models.Classe).all()
@@ -495,9 +367,9 @@ def create_etudiant(
     return RedirectResponse("/admin/dashboard", status_code=303)
 
 
-# =====================================================
+
 # EDIT PROFESSEUR
-# =====================================================
+
 @router.get("/professeur/edit/{id}")
 def edit_professeur_page(id: int, request: Request, db: Session = Depends(get_db)):
     professeur = db.get(models.Professeur, id)
@@ -529,13 +401,14 @@ def edit_professeur(
     if password:
         professeur.password_hash = hash_password(password)
 
+    log_activity(db, "professeur", f"Professeur modifié : {professeur.prenom} {professeur.nom}")
     db.commit()
     return RedirectResponse("/admin/dashboard", status_code=303)
 
 
-# =====================================================
+
 # EDIT ETUDIANT
-# =====================================================
+
 @router.get("/etudiant/edit/{id}")
 def edit_etudiant_page(id: int, request: Request, db: Session = Depends(get_db)):
     etudiant = db.get(models.Etudiant, id)
@@ -570,21 +443,23 @@ def edit_etudiant(
     if password:
         etudiant.password_hash = hash_password(password)
 
+    log_activity(db, "etudiant", f"Étudiant modifié : {etudiant.prenom} {etudiant.nom}")
     db.commit()
     return RedirectResponse("/admin/dashboard", status_code=303)
+
+
 # =====================================================
 # LISTE DES ÉTUDIANTS
 # =====================================================
 @router.get("/etudiants")
 def list_etudiants(request: Request, db: Session = Depends(get_db)):
     etudiants = db.query(models.Etudiant).all()
-    
-    # Charger la classe pour chaque étudiant
+
     for etudiant in etudiants:
         etudiant.classe  # Force le chargement de la classe
         if etudiant.classe:
             etudiant.classe.filiere  # Force le chargement de la filière
-    
+
     return templates.TemplateResponse(
         "list_etudiants.html",
         {
@@ -593,10 +468,8 @@ def list_etudiants(request: Request, db: Session = Depends(get_db)):
         }
     )
 
-
-# =====================================================
 # SUPPRIMER ÉTUDIANT
-# =====================================================
+
 @router.post("/etudiant/{id}/delete")
 def delete_etudiant(id: int, db: Session = Depends(get_db)):
     etudiant = db.query(models.Etudiant).filter(models.Etudiant.id == id).first()
@@ -604,11 +477,13 @@ def delete_etudiant(id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Étudiant non trouvé")
     try:
         db.delete(etudiant)
+        log_activity(db, "etudiant", f"Étudiant supprimé : {etudiant.prenom} {etudiant.nom}")
         db.commit()
         return RedirectResponse("/admin/etudiants?success=Étudiant supprimé avec succès", status_code=303)
     except Exception as e:
         db.rollback()
         return RedirectResponse(f"/admin/etudiants?error=Erreur lors de la suppression : {str(e)}", status_code=303)
+
 
 # =====================================================
 # LIAISON PROFESSEUR ↔ CLASSES
@@ -632,12 +507,12 @@ def assign_classes_to_professeur(
     if not professeur:
         raise HTTPException(status_code=404, detail="Professeur non trouvé")
 
-    # Reset classes
     professeur.classes = []
     for class_id in classes_ids:
         classe = db.get(models.Classe, class_id)
         if classe:
             professeur.classes.append(classe)
 
+    log_activity(db, "professeur", f"Classes assignées au professeur : {professeur.prenom} {professeur.nom}")
     db.commit()
     return RedirectResponse("/admin/dashboard", status_code=303)
