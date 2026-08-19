@@ -1,152 +1,205 @@
-# 📝 ExamCorrect — Système de Correction d'Examens par IA
+#  CorrectIA — AI-Powered Exam Correction System
 
-Projet complet avec **backend FastAPI** + **frontend React** moderne.
+A complete exam management and automatic correction platform: **FastAPI backend** (PostgreSQL) + **React/Vite frontend**, with AI-assisted correction (Sentence Transformers / Hugging Face).
 
 ---
 
-## 📁 Structure du projet
+## 📁 Project structure
 
 ```
-projet_correction/
-├── backend/                  ← FastAPI (ton code original + nouvelles API REST)
+CorrectIA-Exam-Correction/
+├── docker-compose.yml         ← Orchestrates db + backend + frontend
+│
+├── backend/                   ← FastAPI application
 │   ├── app/
-│   │   ├── main.py           ← Point d'entrée (CORS + Session + Routes)
-│   │   ├── models.py         ← Modèles SQLAlchemy
-│   │   ├── schemas.py        ← Schémas Pydantic
-│   │   ├── database.py       ← Connexion MySQL
-│   │   ├── auth.py           ← Hash / verify password
-│   │   ├── routers/          ← Routes HTML originales (Jinja2)
-│   │   │   ├── admin.py
+│   │   ├── main.py            ← Entry point (CORS, session, routes)
+│   │   ├── models.py          ← SQLAlchemy models (Admin, Filiere, Classe,
+│   │   │                         Professeur, Etudiant, Examen, Copie, Note)
+│   │   ├── database.py        ← PostgreSQL connection (+ loads .env)
+│   │   ├── auth.py            ← Password hashing / verification
+│   │   ├── utils.py           ← Utility functions (log_activity, etc.)
+│   │   ├── routers/           ← Server-rendered HTML routes (Jinja2)
+│   │   │   ├── admin.py       ← /admin/... (login, dashboard, CRUD)
 │   │   │   ├── professeur.py
 │   │   │   ├── etudiant.py
 │   │   │   └── examen.py
-│   │   └── api/              ← 🆕 Nouvelles routes REST JSON (pour React)
-│   │       ├── __init__.py
-│   │       ├── auth.py       ← POST /api/auth/login → JWT token
-│   │       ├── admin.py      ← CRUD professeurs, étudiants, filières, classes
-│   │       ├── professeur.py ← Dashboard prof, examens, résultats
-│   │       ├── etudiant.py   ← Dashboard étudiant, notes
-│   │       └── examen.py     ← Créer examen, uploader correction
-│   ├── scripts/              ← Scripts IA de correction (inchangés)
-│   ├── templates/            ← Templates HTML originaux (inchangés)
-│   └── requirements.txt
+│   │   └── api/                ← REST JSON routes consumed by the React frontend
+│   │       ├── auth.py         ← POST /api/auth/login → JWT
+│   │       ├── admin.py        ← CRUD for teachers, students, programs, classes
+│   │       ├── professeur.py   ← Teacher dashboard, exams, results
+│   │       ├── etudiant.py     ← Student dashboard, grades
+│   │       └── examen.py       ← Create an exam, upload the correction
+│   │
+│   ├── scripts/                ← AI correction scripts and utilities
+│   │   ├── create_admin.py     ← Creates the first admin account
+│   │   ├── process_corrige_prof.py
+│   │   ├── generate_students_json.py
+│   │   ├── compare_answers_HF.py  ← Answer comparison (Sentence Transformers)
+│   │   └── text_extractor.py
+│   │
+│   ├── templates/               ← HTML templates (Jinja2, not committed)
+│   ├── uploads/                 ← Uploaded files (not committed)
+│   ├── .env.example             ← Configuration template (copy to .env)
+│   ├── requirements.txt
+│   └── Dockerfile
 │
-└── frontend/                 ← React + Vite (interface moderne)
+└── frontend/                    ← React + Vite interface
     ├── src/
-    │   ├── App.jsx            ← Router principal
-    │   ├── context/
-    │   │   └── AuthContext.jsx ← Gestion JWT + état global
-    │   ├── services/
-    │   │   └── api.js         ← Axios avec intercepteurs JWT
-    │   ├── components/
-    │   │   ├── UI.jsx         ← Composants réutilisables (Btn, Card, Modal, Table...)
-    │   │   └── Layout.jsx     ← Sidebar + navigation
+    │   ├── App.jsx               ← Main router
+    │   ├── context/AuthContext.jsx  ← JWT token handling
+    │   ├── services/api.js       ← Axios instance (proxy /api → backend)
+    │   ├── components/           ← Layout, reusable UI components
     │   └── pages/
-    │       ├── LoginPage.jsx       ← Connexion (Admin / Prof / Étudiant)
-    │       ├── AdminDashboard.jsx  ← Gestion complète
-    │       ├── ProfesseurDashboard.jsx ← Examens + correction IA
-    │       └── EtudiantDashboard.jsx   ← Résultats + notes
-    ├── index.html
-    ├── package.json
-    └── vite.config.js         ← Proxy vers backend :8000
+    │       ├── LoginPage.jsx
+    │       ├── AdminDashboard.jsx
+    │       ├── ProfesseurDashboard.jsx
+    │       └── EtudiantDashboard.jsx
+    ├── vite.config.js            ← Proxies /api and /uploads to the backend
+    └── package.json
 ```
 
 ---
 
-## 🚀 Installation et démarrage
+## 🧱 Tech stack
 
-### 1. Backend
+| Layer | Technologies |
+|---|---|
+| Backend | FastAPI, SQLAlchemy 2, PostgreSQL, JWT (`python-jose`), `passlib`/`bcrypt` |
+| AI | Sentence Transformers, Torch, PyMuPDF, Tesseract OCR (`pytesseract`) |
+| Frontend | React 18, Vite, React Router, Axios, Recharts |
+| Infra | Docker / Docker Compose |
+
+---
+
+## 🚀 Setup and running the project
+
+### Option A — With Docker (recommended)
+
+This is the simplest way: `docker-compose.yml` starts the PostgreSQL database, the backend, and the frontend together, already wired to each other.
 
 ```bash
+# 1. Configure secrets
 cd backend
+cp .env.example .env
+# → open .env and replace SECRET_KEY / SECRET_JWT_KEY with real random values
+cd ..
 
-# Créer un environnement virtuel
-python -m venv venv
-source venv/bin/activate       # Linux/Mac
-venv\Scripts\activate          # Windows
-
-# Installer les dépendances
-pip install -r requirements.txt
-#creer tables
-
-python -c "from app.database import engine, Base; from app import models; Base.metadata.create_all(bind=engine); print('Tables created successfully')"
-
-# Configurer la base de données MySQL dans app/database.py
-# DATABASE_URL = "mysql+pymysql://root:PASSWORD@localhost/db_exam"
-
-# Créer un admin (script fourni)
- python -m scripts.create_admin
-
-# Lancer le serveur
-python -m uvicorn app.main:app --reload --port 8000
-
+# 2. Start all services
+docker compose up --build
 ```
 
-### 2. Frontend
+- Backend available at **http://localhost:8000** (Swagger docs: `/docs`)
+- Frontend available at **http://localhost:5173**
+- PostgreSQL database on `localhost:5432`
 
+> ⚠️ The Vite proxy (`vite.config.js`) points to `http://backend:8000` — this hostname only resolves **inside the Docker network**. If you run the frontend with `npm run dev` outside Docker, change `backend` to `localhost` in `vite.config.js`, or run the frontend through Docker as well.
+
+### Option B — Without Docker (local development)
+
+**Backend:**
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate        # Windows: venv\Scripts\activate
+
+pip install -r requirements.txt
+
+# Configuration
+cp .env.example .env
+# → fill in SECRET_KEY, SECRET_JWT_KEY, and DATABASE_URL (a local PostgreSQL database)
+
+# Create the tables
+python -c "from app.database import engine, Base; from app import models; Base.metadata.create_all(bind=engine)"
+
+# Create the first admin account
+python -m scripts.create_admin
+
+# Start the server
+uvicorn app.main:app --reload --port 8000
+```
+
+**Frontend:**
 ```bash
 cd frontend
-
-# Installer les dépendances
 npm install
-
-# Lancer en développement
 npm run dev
 # → http://localhost:5173
 ```
 
 ---
 
-## 🔐 Authentification
+## 🔐 Configuration (`.env`)
 
-Le frontend utilise **JWT Bearer tokens** via `/api/auth/login`.
+The backend reads its configuration from `backend/.env` (never committed to Git — see `.gitignore`). Copy `.env.example` to get started:
 
-| Rôle        | URL de connexion | Permissions                     |
-|-------------|------------------|---------------------------------|
-| Admin       | `/login`         | CRUD tout                       |
-| Professeur  | `/login`         | Créer examens, uploader copies  |
-| Étudiant    | `/login`         | Voir ses résultats              |
-
----
-
-## 🌐 API REST (nouvelles routes)
-
-| Méthode | Endpoint                              | Description                    |
-|---------|---------------------------------------|--------------------------------|
-| POST    | `/api/auth/login`                     | Connexion → JWT token          |
-| GET     | `/api/auth/me`                        | Profil utilisateur connecté    |
-| GET     | `/api/admin/stats`                    | Statistiques globales          |
-| GET/POST| `/api/admin/professeurs`              | Liste / créer professeur       |
-| GET/POST| `/api/admin/etudiants`                | Liste / créer étudiant         |
-| GET/POST| `/api/admin/filieres`                 | Liste / créer filière          |
-| GET/POST| `/api/admin/classes`                  | Liste / créer classe           |
-| GET     | `/api/professeur/dashboard`           | Dashboard prof + stats         |
-| GET     | `/api/professeur/examens`             | Mes examens                    |
-| GET     | `/api/professeur/examens/{id}/resultats` | Résultats d'un examen       |
-| POST    | `/api/examen/creer`                   | Créer un examen (multipart)    |
-| POST    | `/api/examen/{id}/upload-correction`  | Uploader corrigé + copies      |
-| GET     | `/api/etudiant/dashboard`             | Notes et infos étudiant        |
-
----
-
-## 🧠 Fonctionnement de la correction IA
-
-1. Le professeur upload le **corrigé type** (PDF) + les **copies étudiantes** (PDFs nommés par CNE)
-2. Le backend extrait le texte des PDFs (`process_corrige_prof`, `generate_students_json`)
-3. Les réponses sont comparées via **Sentence Transformers** (HuggingFace) dans `compare_answers_HF.py`
-4. Les **notes et certitudes** sont stockées dans la table `note`
-5. Les étudiants voient leurs résultats en temps réel
-
----
-
-## ⚙️ Configuration
-
-### Base de données (`backend/app/database.py`)
-```python
-DATABASE_URL = "mysql+pymysql://root:VOTRE_MDP@localhost/db_exam"
+```env
+SECRET_KEY=...          # session key (starlette SessionMiddleware)
+SECRET_JWT_KEY=...      # JWT signing key
+DATABASE_URL=postgresql+psycopg2://postgres:YOUR_PASSWORD@localhost:5432/db_exam
+HF_TOKEN=...            # Hugging Face token (if used by the AI correction scripts)
 ```
 
-### CORS (`backend/app/main.py`)
-```python
-allow_origins=["http://localhost:5173"]  # Ajouter votre domaine en production
+Without `SECRET_KEY` or `SECRET_JWT_KEY`, the application refuses to start (`RuntimeError`) — this is intentional, to avoid forgetting to configure these values.
+
+Generate secure random keys with:
+```bash
+python -c "import secrets; print(secrets.token_hex(32))"
 ```
+
+---
+
+## 🔑 Authentication
+
+The React frontend uses **JWT tokens** via `POST /api/auth/login` (file `backend/app/api/auth.py`).
+
+| Role | Permissions |
+|---|---|
+| Admin | Full management: programs, classes, teachers, students |
+| Teacher | Create exams, upload student papers and the answer key, view results |
+| Student | View their own grades and results |
+
+There is also a server-rendered HTML interface (Jinja2) available at `/admin/login`, independent from the React frontend — useful for direct administration without going through the frontend.
+
+---
+
+## 🌐 Main REST API routes
+
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/api/auth/login` | Login → returns a JWT token |
+| GET | `/api/auth/me` | Profile of the logged-in user |
+| GET | `/api/admin/stats` | Global statistics |
+| GET/POST/PUT/DELETE | `/api/admin/filieres` | Manage academic programs |
+| GET/POST/PUT/DELETE | `/api/admin/classes` | Manage classes |
+| GET/POST/PUT/DELETE | `/api/admin/professeurs` | Manage teachers |
+| GET/POST/PUT/DELETE | `/api/admin/etudiants` | Manage students |
+| GET | `/api/professeur/dashboard` | Teacher dashboard |
+| GET | `/api/professeur/examens` | List of the teacher's exams |
+| PUT | `/api/professeur/examens/{id}/etudiants/{id}/note` | Edit a grade |
+| POST | `/api/examen/creer` | Create an exam |
+| POST | `/api/examen/{id}/upload-correction` | Upload the answer key + student papers |
+| GET | `/api/etudiant/dashboard` | Logged-in student's results |
+
+
+---
+
+## 🧠 How automatic correction works
+
+1. The teacher uploads the **reference answer key** (PDF) and the **student papers** (PDFs named by student ID/CNE).
+2. The backend extracts text from the PDFs (`text_extractor.py`, `process_corrige_prof.py`, `generate_students_json.py`).
+3. Student answers are compared to the reference answers using **Sentence Transformers** (`compare_answers_HF.py`).
+4. Grades and confidence scores are stored in the `note` table.
+5. Students view their results from their dashboard in real time.
+
+---
+
+## 🗄️ Database
+
+PostgreSQL 16 (via Docker: `postgres:16-alpine`). Main tables: `admin`, `filiere`, `classe`, `professeur`, `etudiant`, `examen`, `copie`, `note`.
+
+Create the tables manually (without Docker):
+```bash
+python -c "from app.database import Base, engine; from app import models; Base.metadata.create_all(engine)"
+```
+
+👩‍💻 Amlou Oumaima
